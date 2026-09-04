@@ -36,8 +36,9 @@ patches/
 - NPU RNG checkpoint 保存和恢复；
 - 8×Ascend 910B 单步训练验收配置。
 
-当前阶段不宣称已经复现 FastH3 四步 DMD2 或 VSA。Dense 单步训练通过后，下一阶段将接入
-H3 联合视频/音频 DMD2，并固定 student rollout 为 `[999, 749, 500, 250]`。
+当前补丁已加入 Dense H3 联合视频/音频 DMD2 工程 bring-up，固定 student rollout 为
+`[999, 749, 500, 250]`，并包含 DCP student 导出和四次 DiT 推理入口。该配置只用于先跑通
+完整闭环，不宣称复现尚未公开的 FastH3 效果 recipe，也尚未加入 VSA。
 
 ## 上游基线
 

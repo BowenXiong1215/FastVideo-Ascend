@@ -1,10 +1,11 @@
-# FastVideo MiniMax-H3 昇腾 910B 训练补丁包（阶段 1）
+# FastVideo MiniMax-H3 昇腾 910B 训练补丁包（Dense DMD2 bring-up）
 
 此补丁包将指定版本的官方 FastVideo 源码转换为昇腾 910B MiniMax-H3
 Dense T2VA 训练底座。当前阶段覆盖 HCCL、Dense SDPA、FSDP/HSDP、序列并行、
 视频/音频/文本预处理、前后向、优化器单步和 NPU RNG 断点恢复。
 
-本阶段不宣称已经复现 FastH3 四步 DMD2 或 VSA；它是进入四步蒸馏前的训练底座验收。
+补丁还提供 Dense H3 四步 DMD2 工程闭环；它用于先产出能做四次 DiT forward 推理的
+student，不宣称已经复现尚未公开的 FastH3 效果 recipe，也不包含 VSA。
 
 ## 基线
 
@@ -15,7 +16,7 @@ Commit：7bb76b5ec99807a66aa3047b901f15019abe0f00
 参考镜像：quay.io/ascend/triton:3.2.1-cann9.0.0-torch_npu2.7.1.post4-910b-ubuntu22.04-py3.11
 ```
 
-安装器处理 10 个官方源码文件，并加入 10 个昇腾环境、容器、配置、训练、权重检查和说明文件。
+安装器处理 14 个官方源码文件，并加入 15 个昇腾环境、容器、配置、训练、权重检查和说明文件。
 官方源码文件通过 `sed -i` 更新；新增文件从补丁载荷复制。
 
 ## 使用
@@ -129,6 +130,34 @@ Loading transformer weights with CPU staging=True, FSDP CPU offload=False
 ```
 
 这只改变权重加载峰值，不改变参数 dtype、训练期参数驻留位置或数值精度。
+
+## Dense DMD2 四步闭环
+
+阶段 1 成功后运行一轮 student/teacher/critic 联合视频音频 DMD2：
+
+```bash
+python scripts/verify_minimax_h3_dmd2_config.py \
+  examples/train/configs/ascend/minimax_h3_t2va_dmd2_4step_smoke.yaml \
+  --check-paths
+
+NUM_NPUS=8 bash examples/train/run_ascend.sh \
+  examples/train/configs/ascend/minimax_h3_t2va_dmd2_4step_smoke.yaml
+```
+
+该 smoke 固定 `[999, 749, 500, 250]`，并使用 FSDP CPU offload 容纳三份 33B
+Transformer。它会很慢并消耗大量主机内存，但不降低 BF16 训练精度。
+
+一步完成后导出 student 并进行四步 Dense SDPA 推理：
+
+```bash
+bash examples/train/export_minimax_h3_dmd2_ascend.sh
+
+python examples/inference/basic/basic_minimax_h3_dense_4step_ascend.py \
+  --model-path runs/ascend_minimax_h3_dense_dmd2_4step_export \
+  --prompt 'A cinematic scene with synchronized environmental sound.'
+```
+
+推理入口强制五个 sigma 网格点，即恰好四次 DiT forward。
 
 完整说明见：
 

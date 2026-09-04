@@ -31,4 +31,4 @@ while IFS=$'\t' read -r expected relative; do
 done < "${PATCH_ROOT}/added.tsv"
 
 test "${failed}" -eq 0
-echo "FastVideo Ascend 910B stage-1 patched tree: PASS"
+echo "FastVideo Ascend 910B Dense DMD2 bring-up tree: PASS"

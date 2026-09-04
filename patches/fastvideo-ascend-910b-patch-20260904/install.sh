@@ -32,6 +32,7 @@ is_previous_patch_file() {
     docs/getting_started/ascend_910b_h3_training.md:066e8d74754440fbb61df1f8d6c5a9474071fc46b5900b1785a5fe509a87d3cb | \
     docs/getting_started/ascend_910b_h3_training.md:c636066b71b5c6db3065d8e20348ddeca055b26a1fac97035a55aea946f03624 | \
     docs/getting_started/ascend_910b_h3_training.md:fc6ac0f867d647977f10f3f7b93ffe2193d9fe996d88e0716506b2ca1d26e8cd | \
+    docs/getting_started/ascend_910b_h3_training.md:300fcb1fd2af5cc92d2a5f0f21f8ebb58e7ba81a3769833708f2b2adca2d3d35 | \
     docker/Dockerfile.ascend:7f94639e5716289b952f7c20e79622712f169e60e76d3d03151724400b946dfb | \
     examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:83ff00417898c024a44265376fc841a4bde818c6b4de5f7e304057d78e3bff90 | \
     examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:51b24a7c5d21cc3c7eb5e17be5029b9dddc1c08c017225e4ee53b1eb34815623 | \
@@ -160,4 +161,4 @@ apply_replacements
 install_additions
 verify_installed_tree
 
-echo "FastVideo Ascend 910B stage-1 patch: PASS"
+echo "FastVideo Ascend 910B Dense DMD2 bring-up patch: PASS"

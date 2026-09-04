@@ -116,12 +116,38 @@ Success means all ranks pass model load and HCCL warmup, the logged loss is
 finite, backward completes, and one optimizer step completes. Keep validation
 off until this passes, because it loads additional inference components.
 
-## 5. What follows this smoke test
+## 5. Dense DMD2 four-step bring-up
 
-After dense SFT is numerically stable, extend the H3 model plugin to the public
-DMD2 role contract (student, frozen teacher, trainable critic), then lock the
-student rollout to `[999, 749, 500, 250]`. The exact H3 VSA backend comes after
-dense four-step parity: its CUDA/Triton training kernel cannot be reused on NPU,
-so Ascend needs a reference forward/backward implementation before any kernel
-optimization. Recipe-specific loss weights and sampling policy remain gated on
-the official H3 recipe.
+After dense SFT is numerically stable, run the engineering bring-up recipe. It
+implements the public DMD2 student/teacher/critic structure over H3's joint
+video/audio latent pair, uses each modality's scheduler shift, and locks the
+student ladder to `[999, 749, 500, 250]`:
+
+```bash
+NUM_NPUS=8 bash examples/train/run_ascend.sh \
+  examples/train/configs/ascend/minimax_h3_t2va_dmd2_4step_smoke.yaml
+```
+
+All three 33B roles use FSDP CPU offload. This trades training speed and host
+memory for NPU capacity without changing BF16 computation. The one-step smoke
+is intended to validate finite student and critic losses, both backwards,
+optimizer updates, and DCP output—not model quality.
+
+Export the resulting student checkpoint:
+
+```bash
+bash examples/train/export_minimax_h3_dmd2_ascend.sh
+```
+
+Run the exported model with exactly five sigma-grid points, hence four DiT
+forwards, using dense SDPA on 8 NPUs:
+
+```bash
+python examples/inference/basic/basic_minimax_h3_dense_4step_ascend.py \
+  --model-path runs/ascend_minimax_h3_dense_dmd2_4step_export \
+  --prompt 'A cinematic scene with synchronized environmental sound.'
+```
+
+This is explicitly a mechanics recipe. Recipe-specific loss weights, prompt
+distribution, score sampling, and convergence length remain gated on the
+official FastH3 training release. VSA comes only after dense four-step parity.
