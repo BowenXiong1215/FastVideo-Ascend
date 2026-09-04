@@ -34,6 +34,9 @@ is_previous_patch_file() {
     docker/Dockerfile.ascend:7f94639e5716289b952f7c20e79622712f169e60e76d3d03151724400b946dfb | \
     examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:83ff00417898c024a44265376fc841a4bde818c6b4de5f7e304057d78e3bff90 | \
     examples/train/prepare_minimax_h3_ascend.sh:07fde333a1d22227d13747b262f5d8dc5faf5c6fe85f9db62e9c974e0a0de8de | \
+    examples/train/prepare_minimax_h3_ascend.sh:c08ef4ca99cbed27151f13499ad5149fc7bd2701a394bfa8d55296c76e84ba8d | \
+    examples/train/prepare_minimax_h3_ascend.sh:a909b14aa4233c58eed9d5e1280abbb6913e294f6012783dcbe677cb55fc1a73 | \
+    examples/train/prepare_minimax_h3_ascend.sh:5eefaaf1d21dc56023e3edb7e07d264491f41f974926c243a679c4a2cacb7318 | \
     requirements/ascend-training.txt:cf01e2819c9bb4b7bb999de6026850b4a8e40dbc8ce5ed2836bb725b0dbd85b2 | \
     requirements/ascend-training.txt:cda0d5cb64caccd8d11d46aa295f39b07beb8fa3bfe906e9c2a7027d213d2b72 | \
     scripts/install_ascend_dependencies.sh:97a2297c8447f9073881e0bcc71d0b84bfa983076b2a05296be053765bd95632 | \

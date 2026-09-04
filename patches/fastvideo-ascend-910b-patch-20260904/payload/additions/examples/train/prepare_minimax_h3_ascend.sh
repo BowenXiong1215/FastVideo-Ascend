@@ -41,7 +41,8 @@ fi
 
 export ASCEND_RT_VISIBLE_DEVICES="${ASCEND_RT_VISIBLE_DEVICES:-0}"
 python -m torch.distributed.run \
-  --standalone \
+  --master-addr=127.0.0.1 \
+  --master-port=29531 \
   --nnodes=1 \
   --nproc-per-node=1 \
   -m fastvideo.pipelines.preprocess.preprocess_minimax_h3_overfit \
