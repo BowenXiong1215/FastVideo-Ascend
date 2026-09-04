@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-MODEL_PATH="${MINIMAX_H3_MODEL_PATH:-/hpc-to-ds-0115/x00876811/models/MiniMax-H3}"
+MODEL_PATH="${MINIMAX_H3_MODEL_PATH:-/models/MiniMax-H3}"
 DATA_DIR="${MINIMAX_H3_DATA_DIR:-${REPO_ROOT}/data/crush-smol}"
 OUTPUT_DIR="${MINIMAX_H3_OUTPUT_DIR:-${REPO_ROOT}/data/crush-smol_h3_t2va_single_sample_preprocessed}"
 

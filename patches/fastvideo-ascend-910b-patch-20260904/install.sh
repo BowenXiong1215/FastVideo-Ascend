@@ -33,13 +33,17 @@ is_previous_patch_file() {
     docs/getting_started/ascend_910b_h3_training.md:c636066b71b5c6db3065d8e20348ddeca055b26a1fac97035a55aea946f03624 | \
     docs/getting_started/ascend_910b_h3_training.md:fc6ac0f867d647977f10f3f7b93ffe2193d9fe996d88e0716506b2ca1d26e8cd | \
     docs/getting_started/ascend_910b_h3_training.md:300fcb1fd2af5cc92d2a5f0f21f8ebb58e7ba81a3769833708f2b2adca2d3d35 | \
+    docs/getting_started/ascend_910b_h3_training.md:376801dbb40acd99ad7a0a66d268a914f286f393e9648d052013a81e009fe55c | \
     docker/Dockerfile.ascend:7f94639e5716289b952f7c20e79622712f169e60e76d3d03151724400b946dfb | \
     examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:83ff00417898c024a44265376fc841a4bde818c6b4de5f7e304057d78e3bff90 | \
     examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:51b24a7c5d21cc3c7eb5e17be5029b9dddc1c08c017225e4ee53b1eb34815623 | \
+    examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:edecc443c2ec5971118521b7265c5808353e0700203b711f7d899d2817440841 | \
+    examples/train/configs/ascend/minimax_h3_t2va_dmd2_4step_smoke.yaml:75ed1fefedba7623a3b1347d9311fccc079d172fec21fea08ee4e008a5bcabc8 | \
     examples/train/prepare_minimax_h3_ascend.sh:07fde333a1d22227d13747b262f5d8dc5faf5c6fe85f9db62e9c974e0a0de8de | \
     examples/train/prepare_minimax_h3_ascend.sh:c08ef4ca99cbed27151f13499ad5149fc7bd2701a394bfa8d55296c76e84ba8d | \
     examples/train/prepare_minimax_h3_ascend.sh:a909b14aa4233c58eed9d5e1280abbb6913e294f6012783dcbe677cb55fc1a73 | \
     examples/train/prepare_minimax_h3_ascend.sh:5eefaaf1d21dc56023e3edb7e07d264491f41f974926c243a679c4a2cacb7318 | \
+    examples/train/prepare_minimax_h3_ascend.sh:a1bf6934162441300b71c7a3bd2fc113b6245188e220b4a230cb921e2e63dd42 | \
     requirements/ascend-training.txt:cf01e2819c9bb4b7bb999de6026850b4a8e40dbc8ce5ed2836bb725b0dbd85b2 | \
     requirements/ascend-training.txt:cda0d5cb64caccd8d11d46aa295f39b07beb8fa3bfe906e9c2a7027d213d2b72 | \
     requirements/ascend-training.txt:ec35bab34be444a69aa793a1165c06d3ad8fd431d9006851bc0285d33874219a | \

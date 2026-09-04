@@ -83,12 +83,12 @@ tracker 显式设为 `none`，所以也不要求 W&B。
 
 ## 本地权重检查
 
-默认检查用户现有目录：
+默认检查容器内统一模型目录：
 
 ```bash
-cd /hpc-to-ds-0115/x00876811/fast/FastVideo
+cd /workspace/FastVideo
 python scripts/verify_minimax_h3_checkpoint.py \
-  /hpc-to-ds-0115/x00876811/models/MiniMax-H3
+  /models/MiniMax-H3
 ```
 
 该检查不会加载 498GB 权重到内存；它检查 FastVideo 所需的 Diffusers 目录、JSON、
@@ -98,7 +98,7 @@ ModelScope 仓库提供同样 Diffusers 布局时，才建议用以下命令补�
 ```bash
 pip install modelscope
 modelscope download --model MiniMax/MiniMax-H3 \
-  --local_dir /hpc-to-ds-0115/x00876811/models/MiniMax-H3
+  --local_dir /models/MiniMax-H3
 ```
 
 不要下载 `Comfy-Org/MiniMax-H3` 来代替：它是面向 ComfyUI 的扁平化重打包，不是
@@ -110,7 +110,7 @@ FastVideo 当前 loader 使用的目录结构。
 不少于 124 帧的本地 MP4：
 
 ```bash
-cd /hpc-to-ds-0115/x00876811/fast/FastVideo
+cd /workspace/FastVideo
 export TRAINING_VIDEO_PATH=/absolute/path/to/sample-with-audio.mp4
 export TRAINING_CAPTION='准确描述画面、动作、镜头运动、对白、音乐和环境声。'
 bash examples/train/prepare_minimax_h3_ascend.sh

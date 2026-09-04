@@ -35,12 +35,12 @@ media path.
 ## 2. Checkpoint integrity
 
 The Ascend preparation path does not require Hugging Face access. By default it
-uses `/hpc-to-ds-0115/x00876811/models/MiniMax-H3`. Verify the checkpoint before
+uses `/models/MiniMax-H3`. Verify the checkpoint before
 spending NPU time:
 
 ```bash
 python scripts/verify_minimax_h3_checkpoint.py \
-  /hpc-to-ds-0115/x00876811/models/MiniMax-H3
+  /models/MiniMax-H3
 ```
 
 The verifier checks the Diffusers component layout, all JSON files, all shards
@@ -55,7 +55,7 @@ can be resumed directly into the final directory:
 ```bash
 pip install modelscope
 modelscope download --model MiniMax/MiniMax-H3 \
-  --local_dir /hpc-to-ds-0115/x00876811/models/MiniMax-H3
+  --local_dir /models/MiniMax-H3
 ```
 
 Run the verifier again after a resumed download. If that repository is not yet
