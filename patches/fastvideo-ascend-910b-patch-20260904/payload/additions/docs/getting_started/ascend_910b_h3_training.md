@@ -17,20 +17,66 @@ pip install -e . --no-deps
 python -c 'import torch, torch_npu; print(torch.__version__, torch_npu.__version__, torch.npu.is_available())'
 ```
 
-## 2. Checkpoint and one-sample data
+## 2. Checkpoint integrity
 
-Log in to Hugging Face if the model requires acceptance, then run:
+The Ascend preparation path does not require Hugging Face access. By default it
+uses `/hpc-to-ds-0115/x00876811/models/MiniMax-H3`. Verify the checkpoint before
+spending NPU time:
 
 ```bash
-hf auth login
+python scripts/verify_minimax_h3_checkpoint.py \
+  /hpc-to-ds-0115/x00876811/models/MiniMax-H3
+```
+
+The verifier checks the Diffusers component layout, all JSON files, all shards
+named by safetensors indexes, empty files, unresolved Git LFS pointers, and
+safetensors headers. FastVideo requires `transformer/`, `vae/`, `audio_vae/`,
+`text_encoder/`, `tokenizer/`, `processor/`, `scheduler/`, and
+`audio_scheduler/`. A flattened ComfyUI checkpoint is not interchangeable.
+
+If the official ModelScope repository exposes that same layout, missing files
+can be resumed directly into the final directory:
+
+```bash
+pip install modelscope
+modelscope download --model MiniMax/MiniMax-H3 \
+  --local_dir /hpc-to-ds-0115/x00876811/models/MiniMax-H3
+```
+
+Run the verifier again after a resumed download. If that repository is not yet
+populated or differs in layout, manually copy the complete original
+`MiniMaxAI/MiniMax-H3` snapshot from a connected machine without renaming or
+flattening its files.
+
+## 3. One-sample data
+
+The public Crush-Smol sample is optional for the first optimizer-step run. Any
+local MP4 containing a real audio track and at least 124 frames after 24 FPS
+resampling is sufficient. The preprocessor retains the exact H3 resize/crop,
+32 kHz audio, VAE, and text-encoder path:
+
+```bash
+export TRAINING_VIDEO_PATH=/absolute/path/to/sample-with-audio.mp4
+export TRAINING_CAPTION='Describe the visible action, scene, camera motion, speech, music, and other sounds precisely.'
 bash examples/train/prepare_minimax_h3_ascend.sh
 ```
 
-The preprocessing process loads the video VAE, audio VAE, and text encoder one
-at a time on one NPU. It writes one synchronized T2VA parquet row under
+To use the pinned Crush-Smol fixture instead, manually place these two files
+and run the same script without those environment variables:
+
+```text
+data/crush-smol/videos2caption.json
+data/crush-smol/videos/1gGQy4nxyUo-Scene-016.mp4
+```
+
+The script loads the video VAE, audio VAE, and text encoder one at a time on one
+NPU, then writes a synchronized T2VA Parquet row under
 `data/crush-smol_h3_t2va_single_sample_preprocessed`.
 
-## 3. Acceptance ladder
+For non-default paths, set `MINIMAX_H3_MODEL_PATH`, `MINIMAX_H3_DATA_DIR`, or
+`MINIMAX_H3_OUTPUT_DIR` before running the preparation script.
+
+## 4. Acceptance ladder
 
 First validate configuration and model construction:
 
@@ -55,7 +101,7 @@ Success means all ranks pass model load and HCCL warmup, the logged loss is
 finite, backward completes, and one optimizer step completes. Keep validation
 off until this passes, because it loads additional inference components.
 
-## 4. What follows this smoke test
+## 5. What follows this smoke test
 
 After dense SFT is numerically stable, extend the H3 model plugin to the public
 DMD2 role contract (student, frozen teacher, trainable critic), then lock the

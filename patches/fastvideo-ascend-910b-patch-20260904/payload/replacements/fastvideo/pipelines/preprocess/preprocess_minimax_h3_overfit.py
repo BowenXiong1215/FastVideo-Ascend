@@ -291,10 +291,12 @@ def write_parquet(record: dict[str, Any], output_dir: Path) -> Path:
 
 def validate_preprocessed_training_data(
     output_dir: Path = OUTPUT_DIR,
-    manifest_path: Path = DATA_DIR / "videos2caption.json",
-    video_dir: Path = DATA_DIR / "videos",
+    manifest_path: Path | None = DATA_DIR / "videos2caption.json",
+    video_dir: Path | None = DATA_DIR / "videos",
+    expected_video_path: Path | None = None,
+    expected_caption: str | None = None,
 ) -> None:
-    """Verify that the H3 dataset contains only the selected Crush-Smol record.
+    """Verify that the H3 dataset contains only the selected training record.
 
     The launch path calls this function before Slurm submission so that stale
     Parquet shards or mismatched captions cannot enter the overfit run.
@@ -306,30 +308,55 @@ def validate_preprocessed_training_data(
     table = pq.read_table(expected_path)
     if table.num_rows != 1:
         raise ValueError(f"Expected one training row in {expected_path}, found {table.num_rows}")
-    video_path, expected_caption = load_crush_smol_training_sample(manifest_path, video_dir)
+    if expected_video_path is None:
+        if manifest_path is None or video_dir is None:
+            raise ValueError("manifest_path and video_dir are required when expected_video_path is not provided")
+        video_path, resolved_caption = load_crush_smol_training_sample(manifest_path, video_dir)
+    else:
+        video_path = expected_video_path
+        if expected_caption is None or not expected_caption.strip():
+            raise ValueError("expected_caption must be nonempty when expected_video_path is provided")
+        resolved_caption = expected_caption.strip()
     record = table.to_pylist()[0]
     if record["file_name"] != video_path.name:
         raise ValueError(f"Training row file_name must be {video_path.name!r}, got {record['file_name']!r}")
-    if record["caption"] != expected_caption:
-        raise ValueError("Training row caption does not match the pinned Crush-Smol manifest")
-    print(f"Validated one Crush-Smol H3 training row in {expected_path}")
+    if record["caption"] != resolved_caption:
+        raise ValueError("Training row caption does not match the requested caption")
+    print(f"Validated one MiniMax H3 training row in {expected_path}")
 
 
-def main() -> None:
-    """Encode the selected Crush-Smol record with each H3 component in sequence.
+def main(
+    *,
+    model_path: Path = MODEL_PATH,
+    data_dir: Path = DATA_DIR,
+    output_dir: Path = OUTPUT_DIR,
+    video_path: Path | None = None,
+    caption: str | None = None,
+) -> None:
+    """Encode one selected record with each H3 component in sequence.
 
     Releasing each component before loading the next component keeps video,
     audio, and text preprocessing within one GPU's memory.
     """
     _init_single_process_distributed()
-    resolved_model_path = MODEL_PATH.resolve()
+    resolved_model_path = model_path.resolve()
     if not resolved_model_path.is_dir():
         raise FileNotFoundError(f"Filtered MiniMax H3 model directory is missing at {resolved_model_path}")
     model_index = verify_model_config_and_directory(str(resolved_model_path))
-    video_path, caption = load_crush_smol_training_sample(
-        DATA_DIR / "videos2caption.json",
-        DATA_DIR / "videos",
-    )
+    if (video_path is None) != (caption is None):
+        raise ValueError("--video-path and --caption must be provided together")
+    if video_path is None:
+        video_path, caption = load_crush_smol_training_sample(
+            data_dir / "videos2caption.json",
+            data_dir / "videos",
+        )
+    else:
+        video_path = video_path.resolve()
+        if not video_path.is_file():
+            raise FileNotFoundError(f"Training video is missing at {video_path}")
+        caption = caption.strip() if caption is not None else ""
+        if not caption:
+            raise ValueError("--caption must be nonempty")
     frames, waveform = load_training_media(video_path)
     pipeline_config = MiniMaxH3PipelineConfig()
     fastvideo_args = FastVideoArgs(
@@ -347,21 +374,38 @@ def main() -> None:
     audio_latents = encode_audio_latents(waveform, resolved_model_path, model_index, fastvideo_args)
     text_embedding = encode_text_embedding(caption, resolved_model_path, model_index, fastvideo_args)
     record = build_parquet_record(
-        file_name=TRAINING_VIDEO_NAME,
+        file_name=video_path.name,
         caption=caption,
         video_latents=video_latents,
         audio_latents=audio_latents,
         text_embedding=text_embedding,
     )
-    output_path = write_parquet(record, OUTPUT_DIR)
-    print(f"Wrote one Crush-Smol MiniMax H3 T2VA record to {output_path}")
+    output_path = write_parquet(record, output_dir)
+    print(f"Wrote one MiniMax H3 T2VA record to {output_path}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--validate-only", action="store_true")
+    parser.add_argument("--model-path", type=Path, default=MODEL_PATH)
+    parser.add_argument("--data-dir", type=Path, default=DATA_DIR)
+    parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
+    parser.add_argument("--video-path", type=Path)
+    parser.add_argument("--caption")
     cli_args = parser.parse_args()
     if cli_args.validate_only:
-        validate_preprocessed_training_data()
+        validate_preprocessed_training_data(
+            output_dir=cli_args.output_dir,
+            manifest_path=cli_args.data_dir / "videos2caption.json",
+            video_dir=cli_args.data_dir / "videos",
+            expected_video_path=cli_args.video_path,
+            expected_caption=cli_args.caption,
+        )
     else:
-        main()
+        main(
+            model_path=cli_args.model_path,
+            data_dir=cli_args.data_dir,
+            output_dir=cli_args.output_dir,
+            video_path=cli_args.video_path,
+            caption=cli_args.caption,
+        )

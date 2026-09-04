@@ -25,6 +25,21 @@ require_source_tree() {
   }
 }
 
+is_previous_patch_file() {
+  local relative="$1" actual="$2"
+  case "${relative}:${actual}" in
+    fastvideo/pipelines/preprocess/preprocess_minimax_h3_overfit.py:24476949ecaeca073e08c2bcba2e7a5c3a9ea38a5a970d61252bfb9c8b78f7d8 | \
+    docs/getting_started/ascend_910b_h3_training.md:066e8d74754440fbb61df1f8d6c5a9474071fc46b5900b1785a5fe509a87d3cb | \
+    examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:83ff00417898c024a44265376fc841a4bde818c6b4de5f7e304057d78e3bff90 | \
+    examples/train/prepare_minimax_h3_ascend.sh:07fde333a1d22227d13747b262f5d8dc5faf5c6fe85f9db62e9c974e0a0de8de)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 validate_bundle() {
   local expected relative source actual
   while IFS=$'\t' read -r _ expected relative; do
@@ -48,7 +63,8 @@ validate_target() {
     target="${TARGET_ROOT}/${relative}"
     test -f "${target}" || { echo "Missing upstream file: ${relative}" >&2; exit 4; }
     actual="$(sha256_file "${target}")"
-    if test "${actual}" != "${upstream}" && test "${actual}" != "${expected}"; then
+    if test "${actual}" != "${upstream}" && test "${actual}" != "${expected}" && \
+      ! is_previous_patch_file "${relative}" "${actual}"; then
       echo "Source version mismatch: ${relative}" >&2
       echo "Expected upstream FastVideo commit ${UPSTREAM_COMMIT}" >&2
       exit 4
@@ -57,9 +73,12 @@ validate_target() {
 
   while IFS=$'\t' read -r expected relative; do
     target="${TARGET_ROOT}/${relative}"
-    if test -e "${target}" && test "$(sha256_file "${target}")" != "${expected}"; then
-      echo "Existing addition differs: ${relative}" >&2
-      exit 4
+    if test -e "${target}"; then
+      actual="$(sha256_file "${target}")"
+      if test "${actual}" != "${expected}" && ! is_previous_patch_file "${relative}" "${actual}"; then
+        echo "Existing addition differs: ${relative}" >&2
+        exit 4
+      fi
     fi
   done < "${PATCH_ROOT}/added.tsv"
 }
@@ -81,7 +100,7 @@ apply_replacements() {
   while IFS=$'\t' read -r upstream expected relative; do
     target="${TARGET_ROOT}/${relative}"
     actual="$(sha256_file "${target}")"
-    if test "${actual}" = "${upstream}"; then
+    if test "${actual}" != "${expected}"; then
       replace_with_sed "${target}" "${PATCH_ROOT}/payload/replacements/${relative}"
       echo "sed -i: ${relative}"
     else

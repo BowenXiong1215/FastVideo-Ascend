@@ -15,7 +15,7 @@ Commit：7bb76b5ec99807a66aa3047b901f15019abe0f00
 参考镜像：quay.io/ascend/triton:3.2.1-cann9.0.0-torch_npu2.7.1.post4-910b-ubuntu22.04-py3.11
 ```
 
-安装器处理 8 个官方源码文件，并加入 7 个昇腾环境、容器、配置、训练、下载和说明文件。
+安装器处理 8 个官方源码文件，并加入 8 个昇腾环境、容器、配置、训练、权重检查和说明文件。
 官方源码文件通过 `sed -i` 更新；新增文件从补丁载荷复制。
 
 ## 使用
@@ -50,7 +50,8 @@ bash fastvideo-ascend-910b-patch-20260904/verify.sh \
   /absolute/path/to/FastVideo
 ```
 
-安装脚本可以重复执行；已经应用的文件会显示 `present`。
+安装脚本可以重复执行；已经应用的文件会显示 `present`。如果目标目录安装过本补丁的
+上一版，安装器会识别旧版文件哈希并原地升级，不需要重新下载完整 FastVideo。
 
 ## 容器与依赖
 
@@ -69,10 +70,38 @@ pip install -e . --no-deps
 
 必须使用 `--no-deps`，避免上游依赖将镜像内配套的 `torch/torch_npu` 替换成 CUDA PyTorch。
 
-## 数据与训练验收
+## 本地权重检查
+
+默认检查用户现有目录：
 
 ```bash
-hf auth login
+cd /hpc-to-ds-0115/x00876811/fast/FastVideo
+python scripts/verify_minimax_h3_checkpoint.py \
+  /hpc-to-ds-0115/x00876811/models/MiniMax-H3
+```
+
+该检查不会加载 498GB 权重到内存；它检查 FastVideo 所需的 Diffusers 目录、JSON、
+safetensors 索引引用、空文件、Git LFS 指针和每个 safetensors header。只有在官方
+ModelScope 仓库提供同样 Diffusers 布局时，才建议用以下命令补齐：
+
+```bash
+pip install modelscope
+modelscope download --model MiniMax/MiniMax-H3 \
+  --local_dir /hpc-to-ds-0115/x00876811/models/MiniMax-H3
+```
+
+不要下载 `Comfy-Org/MiniMax-H3` 来代替：它是面向 ComfyUI 的扁平化重打包，不是
+FastVideo 当前 loader 使用的目录结构。
+
+## 数据与训练验收
+
+不需要下载特定 Hugging Face 数据集。先选择任意一条包含音轨、按 24 FPS 重采样后
+不少于 124 帧的本地 MP4：
+
+```bash
+cd /hpc-to-ds-0115/x00876811/fast/FastVideo
+export TRAINING_VIDEO_PATH=/absolute/path/to/sample-with-audio.mp4
+export TRAINING_CAPTION='准确描述画面、动作、镜头运动、对白、音乐和环境声。'
 bash examples/train/prepare_minimax_h3_ascend.sh
 
 NUM_NPUS=8 bash examples/train/run_ascend.sh \
