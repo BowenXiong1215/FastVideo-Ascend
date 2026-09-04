@@ -27,6 +27,7 @@ patches/
 - Ascend NPU 与 HCCL 启动；
 - BF16 Dense SDPA；
 - FSDP/HSDP 与 sequence parallel 通信；
+- H3 权重 CPU 逐张量暂存和 FSDP 流式分片，避免加载阶段 NPU 峰值 OOM；
 - H3 视频、双声道音频和文本联合数据预处理；
 - 本地 Diffusers 权重目录、索引分片、JSON、LFS 指针和 safetensors header 完整性检查；
 - 不访问 Hugging Face，直接使用本地有声 MP4 和 caption；

@@ -15,7 +15,7 @@ Commit：7bb76b5ec99807a66aa3047b901f15019abe0f00
 参考镜像：quay.io/ascend/triton:3.2.1-cann9.0.0-torch_npu2.7.1.post4-910b-ubuntu22.04-py3.11
 ```
 
-安装器处理 8 个官方源码文件，并加入 10 个昇腾环境、容器、配置、训练、权重检查和说明文件。
+安装器处理 10 个官方源码文件，并加入 10 个昇腾环境、容器、配置、训练、权重检查和说明文件。
 官方源码文件通过 `sed -i` 更新；新增文件从补丁载荷复制。
 
 ## 使用
@@ -120,6 +120,15 @@ NUM_NPUS=8 bash examples/train/run_ascend.sh \
 NUM_NPUS=8 bash examples/train/run_ascend.sh \
   examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml
 ```
+
+910B 加载 H3 时，补丁会在 CPU 上逐张量暂存，并立即分发为 FSDP shard，避免每个 rank
+先在 NPU 上保留一份完整的未分片 BF16 Transformer。日志中应出现：
+
+```text
+Loading transformer weights with CPU staging=True, FSDP CPU offload=False
+```
+
+这只改变权重加载峰值，不改变参数 dtype、训练期参数驻留位置或数值精度。
 
 完整说明见：
 
