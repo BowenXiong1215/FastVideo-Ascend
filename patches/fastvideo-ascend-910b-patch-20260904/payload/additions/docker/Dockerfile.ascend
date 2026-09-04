@@ -3,8 +3,12 @@ FROM quay.io/ascend/triton:3.2.1-cann9.0.0-torch_npu2.7.1.post4-910b-ubuntu22.04
 WORKDIR /workspace/FastVideo
 
 COPY requirements/ascend-training.txt /tmp/ascend-training.txt
+COPY requirements/ascend-torch-constraints.txt /tmp/ascend-torch-constraints.txt
 RUN python -m pip install --upgrade pip setuptools wheel && \
-    python -m pip install -r /tmp/ascend-training.txt
+    python -m pip install \
+      --upgrade-strategy only-if-needed \
+      --constraint /tmp/ascend-torch-constraints.txt \
+      --requirement /tmp/ascend-training.txt
 
 COPY . /workspace/FastVideo
 RUN python -m pip install -e . --no-deps

@@ -30,6 +30,7 @@ patches/
 - H3 视频、双声道音频和文本联合数据预处理；
 - 本地 Diffusers 权重目录、索引分片、JSON、LFS 指针和 safetensors header 完整性检查；
 - 不访问 Hugging Face，直接使用本地有声 MP4 和 caption；
+- 带 PyTorch ABI 约束和安装前后版本保护的依赖安装器；
 - 前向、反向与 optimizer step；
 - NPU RNG checkpoint 保存和恢复；
 - 8×Ascend 910B 单步训练验收配置。

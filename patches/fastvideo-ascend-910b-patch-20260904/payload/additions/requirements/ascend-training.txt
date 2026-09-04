@@ -1,5 +1,6 @@
-# Install the matching torch/torchvision/torchaudio/torch_npu wheels first.
-# This file intentionally excludes CUDA-only fastvideo-kernel and flashinfer.
+# The base image must already provide torch 2.7.1 and torch_npu 2.7.1.post4.
+# Install this file with ascend-torch-constraints.txt; use the bundled installer.
+# CUDA-only fastvideo-kernel and flashinfer are intentionally excluded.
 scipy>=1.14.1
 six>=1.16.0
 h5py>=3.12.1
@@ -23,7 +24,7 @@ protobuf>=5.28.3
 huggingface_hub
 cloudpickle
 omegaconf
-torchdata
+torchdata==0.11.0
 pyarrow
 datasets>=4.0.0
 av

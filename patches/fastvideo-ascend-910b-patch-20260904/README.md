@@ -15,7 +15,7 @@ Commit：7bb76b5ec99807a66aa3047b901f15019abe0f00
 参考镜像：quay.io/ascend/triton:3.2.1-cann9.0.0-torch_npu2.7.1.post4-910b-ubuntu22.04-py3.11
 ```
 
-安装器处理 8 个官方源码文件，并加入 8 个昇腾环境、容器、配置、训练、权重检查和说明文件。
+安装器处理 8 个官方源码文件，并加入 10 个昇腾环境、容器、配置、训练、权重检查和说明文件。
 官方源码文件通过 `sed -i` 更新；新增文件从补丁载荷复制。
 
 ## 使用
@@ -61,14 +61,15 @@ bash fastvideo-ascend-910b-patch-20260904/verify.sh \
 docker build -f docker/Dockerfile.ascend -t fastvideo-h3-ascend:stage1 .
 ```
 
-如直接在现有容器内安装：
+如直接在现有容器内安装，只运行补丁提供的安全安装器：
 
 ```bash
-pip install -r requirements/ascend-training.txt
-pip install -e . --no-deps
+bash scripts/install_ascend_dependencies.sh
 ```
 
-必须使用 `--no-deps`，避免上游依赖将镜像内配套的 `torch/torch_npu` 替换成 CUDA PyTorch。
+该脚本在 pip 前后校验 `torch==2.7.1` 与 `torch_npu==2.7.1.post4`，并约束
+`torchvision==0.22.1`、`torchaudio==2.7.1`，避免 pip 升级到 PyTorch 2.14。
+不要再单独执行无约束的 `pip install -r requirements/ascend-training.txt`。
 
 ## 本地权重检查
 

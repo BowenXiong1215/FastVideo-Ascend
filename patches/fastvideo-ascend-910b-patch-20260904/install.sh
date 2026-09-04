@@ -30,8 +30,12 @@ is_previous_patch_file() {
   case "${relative}:${actual}" in
     fastvideo/pipelines/preprocess/preprocess_minimax_h3_overfit.py:24476949ecaeca073e08c2bcba2e7a5c3a9ea38a5a970d61252bfb9c8b78f7d8 | \
     docs/getting_started/ascend_910b_h3_training.md:066e8d74754440fbb61df1f8d6c5a9474071fc46b5900b1785a5fe509a87d3cb | \
+    docs/getting_started/ascend_910b_h3_training.md:c636066b71b5c6db3065d8e20348ddeca055b26a1fac97035a55aea946f03624 | \
+    docker/Dockerfile.ascend:7f94639e5716289b952f7c20e79622712f169e60e76d3d03151724400b946dfb | \
     examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:83ff00417898c024a44265376fc841a4bde818c6b4de5f7e304057d78e3bff90 | \
-    examples/train/prepare_minimax_h3_ascend.sh:07fde333a1d22227d13747b262f5d8dc5faf5c6fe85f9db62e9c974e0a0de8de)
+    examples/train/prepare_minimax_h3_ascend.sh:07fde333a1d22227d13747b262f5d8dc5faf5c6fe85f9db62e9c974e0a0de8de | \
+    requirements/ascend-training.txt:cf01e2819c9bb4b7bb999de6026850b4a8e40dbc8ce5ed2836bb725b0dbd85b2 | \
+    scripts/install_ascend_dependencies.sh:97a2297c8447f9073881e0bcc71d0b84bfa983076b2a05296be053765bd95632)
       return 0
       ;;
     *)

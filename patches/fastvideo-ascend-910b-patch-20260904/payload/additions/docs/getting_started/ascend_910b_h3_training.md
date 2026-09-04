@@ -12,10 +12,14 @@ Do not let FastVideo's normal Linux dependencies replace that PyTorch build:
 
 ```bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
-pip install -r requirements/ascend-training.txt
-pip install -e . --no-deps
+bash scripts/install_ascend_dependencies.sh
 python -c 'import torch, torch_npu; print(torch.__version__, torch_npu.__version__, torch.npu.is_available())'
 ```
+
+Do not install `requirements/ascend-training.txt` without the bundled
+constraints. The installer verifies `torch==2.7.1` and
+`torch_npu==2.7.1.post4` before and after pip, constrains torchvision to the
+matching `0.22.1`, installs FastVideo with `--no-deps`, and runs `pip check`.
 
 ## 2. Checkpoint integrity
 

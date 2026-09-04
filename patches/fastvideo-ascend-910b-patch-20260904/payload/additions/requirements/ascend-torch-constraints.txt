@@ -1,0 +1,4 @@
+# Keep PyTorch ABI-compatible with torch_npu 2.7.1.post4 in the base image.
+torch==2.7.1
+torchvision==0.22.1
+torchaudio==2.7.1
