@@ -43,6 +43,18 @@ python -m pip install -e . --no-deps
 
 echo "Checking that pip preserved the base image PyTorch pair"
 check_framework
+python - <<'PY'
+import av
+import diffusers
+import pyarrow
+import remote_pdb
+import safetensors
+import transformers
+
+import fastvideo
+
+print("FastVideo preprocessing imports: PASS")
+PY
 if ! python -m pip check; then
   echo "WARN: pip check reported an environment conflict; the pinned torch/torch_npu pair is still intact" >&2
 fi

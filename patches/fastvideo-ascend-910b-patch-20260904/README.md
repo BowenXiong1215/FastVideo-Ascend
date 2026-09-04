@@ -69,7 +69,8 @@ bash scripts/install_ascend_dependencies.sh
 
 该脚本在 pip 前后校验 `torch==2.7.1` 与 `torch_npu==2.7.1.post4`，并约束
 `torchvision==0.22.1`、`torchaudio==2.7.1`，避免 pip 升级到 PyTorch 2.14。
-不要再单独执行无约束的 `pip install -r requirements/ascend-training.txt`。
+安装完成后还会执行 FastVideo、PyAV、Diffusers、PyArrow、remote-pdb 等预处理关键模块
+的导入检查。不要再单独执行无约束的 `pip install -r requirements/ascend-training.txt`。
 
 ## 本地权重检查
 

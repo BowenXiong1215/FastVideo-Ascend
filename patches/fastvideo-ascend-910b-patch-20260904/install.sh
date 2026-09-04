@@ -35,7 +35,9 @@ is_previous_patch_file() {
     examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:83ff00417898c024a44265376fc841a4bde818c6b4de5f7e304057d78e3bff90 | \
     examples/train/prepare_minimax_h3_ascend.sh:07fde333a1d22227d13747b262f5d8dc5faf5c6fe85f9db62e9c974e0a0de8de | \
     requirements/ascend-training.txt:cf01e2819c9bb4b7bb999de6026850b4a8e40dbc8ce5ed2836bb725b0dbd85b2 | \
-    scripts/install_ascend_dependencies.sh:97a2297c8447f9073881e0bcc71d0b84bfa983076b2a05296be053765bd95632)
+    requirements/ascend-training.txt:cda0d5cb64caccd8d11d46aa295f39b07beb8fa3bfe906e9c2a7027d213d2b72 | \
+    scripts/install_ascend_dependencies.sh:97a2297c8447f9073881e0bcc71d0b84bfa983076b2a05296be053765bd95632 | \
+    scripts/install_ascend_dependencies.sh:080d4a4f5bb0fffe8ae3f2fa16eec88359d6786ed2502777d54fb863342f52d2)
       return 0
       ;;
     *)

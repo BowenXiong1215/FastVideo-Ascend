@@ -24,6 +24,7 @@ protobuf>=5.28.3
 huggingface_hub
 cloudpickle
 omegaconf
+remote-pdb
 torchdata==0.11.0
 pyarrow
 datasets>=4.0.0
