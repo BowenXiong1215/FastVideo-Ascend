@@ -1,0 +1,14 @@
+FROM quay.io/ascend/triton:3.2.1-cann9.0.0-torch_npu2.7.1.post4-910b-ubuntu22.04-py3.11
+
+WORKDIR /workspace/FastVideo
+
+COPY requirements/ascend-training.txt /tmp/ascend-training.txt
+RUN python -m pip install --upgrade pip setuptools wheel && \
+    python -m pip install -r /tmp/ascend-training.txt
+
+COPY . /workspace/FastVideo
+RUN python -m pip install -e . --no-deps
+
+ENV PYTHONPATH=/workspace/FastVideo
+ENV HCCL_CONNECT_TIMEOUT=1800
+ENV PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
