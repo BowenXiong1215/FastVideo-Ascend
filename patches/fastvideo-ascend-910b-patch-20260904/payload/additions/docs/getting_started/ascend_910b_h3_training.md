@@ -19,7 +19,18 @@ python -c 'import torch, torch_npu; print(torch.__version__, torch_npu.__version
 Do not install `requirements/ascend-training.txt` without the bundled
 constraints. The installer verifies `torch==2.7.1` and
 `torch_npu==2.7.1.post4` before and after pip, constrains torchvision to the
-matching `0.22.1`, installs FastVideo with `--no-deps`, and runs `pip check`.
+matching `0.22.1`, installs FastVideo with `--no-deps`, and imports the actual
+H3 preprocessing and training entrypoints as its acceptance test.
+
+Do not use the full-project `pip check` result as the acceptance test for this
+focused environment. Upstream package metadata also describes optional Web UI,
+serving, CUDA kernel, NVIDIA monitoring, Ray/torchcodec preprocessing, and
+experiment-tracking paths. Packages such as `aiofiles`, `fastapi`, `gradio`,
+`ray`, `torchcodec`, and `fastvideo-kernel` are intentionally absent here. The
+checked-in smoke configuration selects the `none` tracker and does not require
+W&B. In contrast, `remote-pdb` and `ftfy` are included because FastVideo imports
+them eagerly, while torchvision and torchaudio are both required by the H3
+media path.
 
 ## 2. Checkpoint integrity
 

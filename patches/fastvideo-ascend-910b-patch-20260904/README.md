@@ -69,8 +69,16 @@ bash scripts/install_ascend_dependencies.sh
 
 该脚本在 pip 前后校验 `torch==2.7.1` 与 `torch_npu==2.7.1.post4`，并约束
 `torchvision==0.22.1`、`torchaudio==2.7.1`，避免 pip 升级到 PyTorch 2.14。
-安装完成后还会执行 FastVideo、PyAV、Diffusers、PyArrow、remote-pdb 等预处理关键模块
-的导入检查。不要再单独执行无约束的 `pip install -r requirements/ascend-training.txt`。
+安装完成后还会执行 H3 预处理入口、训练入口、PyAV、Diffusers、PyArrow、remote-pdb、
+ftfy、torchvision 和 torchaudio 的实际导入检查。不要再单独执行无约束的
+`pip install -r requirements/ascend-training.txt`。
+
+上游 `fastvideo 0.2.1` 的包元数据同时声明了推理服务、Web UI、CUDA kernel、NVIDIA
+监控、通用 Ray/torchcodec 预处理和实验跟踪依赖。因此对这个 Ascend 精简环境运行
+`pip check` 会报告 `aiofiles`、`fastapi`、`gradio`、`ray`、`torchcodec`、
+`fastvideo-kernel` 等未安装；它们不在当前 H3 Dense 预处理或训练执行路径中。补丁不再
+用完整项目的 `pip check` 当作验收，而是导入本路线真正执行的模块。Smoke 配置将
+tracker 显式设为 `none`，所以也不要求 W&B。
 
 ## 本地权重检查
 

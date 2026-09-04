@@ -52,10 +52,10 @@ import safetensors
 import transformers
 
 import fastvideo
+from fastvideo.pipelines.preprocess import preprocess_minimax_h3_overfit
+from fastvideo.train.entrypoint import train
+from fastvideo.train.models.minimax_h3 import MiniMaxH3Model
 
-print("FastVideo preprocessing imports: PASS")
+print("FastVideo H3 preprocessing and training imports: PASS")
 PY
-if ! python -m pip check; then
-  echo "WARN: pip check reported an environment conflict; the pinned torch/torch_npu pair is still intact" >&2
-fi
 echo "FastVideo Ascend dependency installation: PASS"

@@ -31,16 +31,20 @@ is_previous_patch_file() {
     fastvideo/pipelines/preprocess/preprocess_minimax_h3_overfit.py:24476949ecaeca073e08c2bcba2e7a5c3a9ea38a5a970d61252bfb9c8b78f7d8 | \
     docs/getting_started/ascend_910b_h3_training.md:066e8d74754440fbb61df1f8d6c5a9474071fc46b5900b1785a5fe509a87d3cb | \
     docs/getting_started/ascend_910b_h3_training.md:c636066b71b5c6db3065d8e20348ddeca055b26a1fac97035a55aea946f03624 | \
+    docs/getting_started/ascend_910b_h3_training.md:fc6ac0f867d647977f10f3f7b93ffe2193d9fe996d88e0716506b2ca1d26e8cd | \
     docker/Dockerfile.ascend:7f94639e5716289b952f7c20e79622712f169e60e76d3d03151724400b946dfb | \
     examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:83ff00417898c024a44265376fc841a4bde818c6b4de5f7e304057d78e3bff90 | \
+    examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:51b24a7c5d21cc3c7eb5e17be5029b9dddc1c08c017225e4ee53b1eb34815623 | \
     examples/train/prepare_minimax_h3_ascend.sh:07fde333a1d22227d13747b262f5d8dc5faf5c6fe85f9db62e9c974e0a0de8de | \
     examples/train/prepare_minimax_h3_ascend.sh:c08ef4ca99cbed27151f13499ad5149fc7bd2701a394bfa8d55296c76e84ba8d | \
     examples/train/prepare_minimax_h3_ascend.sh:a909b14aa4233c58eed9d5e1280abbb6913e294f6012783dcbe677cb55fc1a73 | \
     examples/train/prepare_minimax_h3_ascend.sh:5eefaaf1d21dc56023e3edb7e07d264491f41f974926c243a679c4a2cacb7318 | \
     requirements/ascend-training.txt:cf01e2819c9bb4b7bb999de6026850b4a8e40dbc8ce5ed2836bb725b0dbd85b2 | \
     requirements/ascend-training.txt:cda0d5cb64caccd8d11d46aa295f39b07beb8fa3bfe906e9c2a7027d213d2b72 | \
+    requirements/ascend-training.txt:ec35bab34be444a69aa793a1165c06d3ad8fd431d9006851bc0285d33874219a | \
     scripts/install_ascend_dependencies.sh:97a2297c8447f9073881e0bcc71d0b84bfa983076b2a05296be053765bd95632 | \
-    scripts/install_ascend_dependencies.sh:080d4a4f5bb0fffe8ae3f2fa16eec88359d6786ed2502777d54fb863342f52d2)
+    scripts/install_ascend_dependencies.sh:080d4a4f5bb0fffe8ae3f2fa16eec88359d6786ed2502777d54fb863342f52d2 | \
+    scripts/install_ascend_dependencies.sh:caeb47fec7d380193c8fa802b9658dab23fc68f6827d6d9a9d264800e6fa01ad)
       return 0
       ;;
     *)
