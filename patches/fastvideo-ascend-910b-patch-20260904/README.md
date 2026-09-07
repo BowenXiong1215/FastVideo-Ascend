@@ -163,6 +163,14 @@ python examples/inference/basic/basic_minimax_h3_dense_4step_ascend.py \
   --prompt 'A cinematic scene with synchronized environmental sound.'
 ```
 
+新版导出会把训练时的统一 BF16 参数约束写入 `transformer/config.json`。如果 student
+是在升级补丁前导出的，不必重新导出，先修复一次配置：
+
+```bash
+python scripts/repair_minimax_h3_export_dtype.py \
+  runs/ascend_minimax_h3_dense_dmd2_4step_export
+```
+
 推理入口强制五个 sigma 网格点，即恰好四次 DiT forward。
 推理 stage 计时使用当前平台的同步接口：昇腾调用 `torch.npu.synchronize()`，不会误入
 `torch.cuda.synchronize()`；stage 默认设备也跟随当前平台。

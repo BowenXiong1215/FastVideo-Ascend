@@ -345,6 +345,14 @@ Exported four-step student: ...
 导出会以基础模型目录为模板。底层文件系统支持硬链接时，大部分未修改组件不会重复占用
 空间；否则可能复制完整模型，导出前应检查磁盘余量。
 
+新版导出会在 `transformer/config.json` 中保存训练时的统一 BF16 参数约束。若模型是在
+升级补丁前导出的，不需要再次执行耗时导出，只需运行：
+
+```bash
+python scripts/repair_minimax_h3_export_dtype.py \
+  runs/ascend_minimax_h3_dense_dmd2_4step_export
+```
+
 ## 11. 四次 DiT forward 推理
 
 ```bash
