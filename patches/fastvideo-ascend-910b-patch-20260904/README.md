@@ -147,6 +147,12 @@ NUM_NPUS=8 bash examples/train/run_ascend.sh \
 该 smoke 固定 `[999, 749, 500, 250]`，并使用 FSDP CPU offload 容纳三份 33B
 Transformer。它会很慢并消耗大量主机内存，但不降低 BF16 训练精度。
 
+rank 0 会打印 rollout、teacher/critic score、backward、optimizer 和 checkpoint 阶段；
+单个阶段超过 60 秒时还会持续打印包含当前阶段与累计时间的心跳。该日志不执行 NPU 同步，
+不改变训练数值。主机具备足够锁页内存时，可以用
+`--training.distributed.pin_cpu_memory true` 加速 FSDP CPU offload；内存锁定限制不足时保持
+默认 `false`。
+
 一步完成后导出 student 并进行四步 Dense SDPA 推理：
 
 ```bash

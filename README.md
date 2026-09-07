@@ -282,6 +282,39 @@ NUM_NPUS=8 bash examples/train/run_ascend.sh \
 两个 optimizer 更新和 DCP 保存。CPU offload 会显著降低速度并消耗大量主机内存，但不会
 降低 BF16 计算精度。中断未完成的一步不能续训，应重新执行这一整步。
 
+新版会由 rank 0 输出阶段级进度，并在同一阶段超过 60 秒时持续输出心跳。例如：
+
+```text
+[MiniMax-H3 DMD2][12:34:56] step=1 student-gradient rollout: student forward 1/3 at t=999 elapsed=61.2s
+[MiniMax-H3 DMD2][12:35:56] step=1 still working: student-gradient rollout: student forward 1/3 at t=999 elapsed=121.2s
+```
+
+日志覆盖两次 rollout、teacher/critic score、两个 backward、optimizer 和 checkpoint state。
+心跳线程不调用 NPU synchronize、不读取模型张量、不消耗随机数，因此不改变 loss 或训练
+精度。
+
+### 不改变训练数学的加速选项
+
+如果主机拥有足够内存且允许锁页，可以开启 FSDP pinned CPU memory，减少 CPU offload 的
+Host-to-Device 等待：
+
+```bash
+ulimit -l
+
+NUM_NPUS=8 bash examples/train/run_ascend.sh \
+  examples/train/configs/ascend/minimax_h3_t2va_dmd2_4step_smoke.yaml \
+  --training.distributed.pin_cpu_memory true
+```
+
+只有 `ulimit -l` 足够大并且主机没有内存压力时才使用；否则保持默认 `false`。另外，把模型
+权重、预处理 Parquet 和 checkpoint 放在本机 NVMe，确保容器没有 CPU/内存 cgroup 限速，
+并按 NPU/PCIe NUMA 拓扑分配 CPU，也只影响等待时间而不改变训练目标。多步训练可以降低
+checkpoint 保存频率，这不会改变参数更新，但会缩短可恢复的故障窗口。
+
+以下改动不能算“无损加速”，本 bring-up 不默认使用：降低分辨率或帧数、减少 rollout、
+降低 student 更新频率、关闭 Dense attention、改用 VSA/量化、改变 dtype，或修改
+gradient checkpoint 策略。
+
 完成后检查：
 
 ```bash

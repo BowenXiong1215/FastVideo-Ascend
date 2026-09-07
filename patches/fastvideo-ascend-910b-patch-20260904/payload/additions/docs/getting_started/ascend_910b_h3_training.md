@@ -133,6 +133,15 @@ memory for NPU capacity without changing BF16 computation. The one-step smoke
 is intended to validate finite student and critic losses, both backwards,
 optimizer updates, and DCP output—not model quality.
 
+Rank zero reports every rollout, teacher/critic score, backward, optimizer,
+and checkpoint-state phase. A daemon heartbeat repeats the current phase and
+elapsed time every 60 seconds while a large operation is still running. It
+does not synchronize the NPU, inspect model tensors, or consume RNG state, so
+the instrumentation does not alter the training math. On hosts with enough
+locked memory, `--training.distributed.pin_cpu_memory true` can reduce FSDP
+CPU-offload transfer waits without changing BF16 computation; leave it false
+when the memlock limit or host memory is insufficient.
+
 Export the resulting student checkpoint:
 
 ```bash
