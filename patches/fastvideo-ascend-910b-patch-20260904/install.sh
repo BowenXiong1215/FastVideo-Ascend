@@ -35,6 +35,7 @@ is_previous_patch_file() {
     docs/getting_started/ascend_910b_h3_training.md:300fcb1fd2af5cc92d2a5f0f21f8ebb58e7ba81a3769833708f2b2adca2d3d35 | \
     docs/getting_started/ascend_910b_h3_training.md:376801dbb40acd99ad7a0a66d268a914f286f393e9648d052013a81e009fe55c | \
     docs/getting_started/ascend_910b_h3_training.md:2bfc330acacdb3a5a98fb5ba1da60e12d263efc16a0454fe1f791ac7f3801fdb | \
+    docs/getting_started/ascend_910b_h3_training.md:b46bea4ac51a7ca10d8f89277b507851319162864d44a335a0242ffdf69b6b74 | \
     docker/Dockerfile.ascend:7f94639e5716289b952f7c20e79622712f169e60e76d3d03151724400b946dfb | \
     examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:83ff00417898c024a44265376fc841a4bde818c6b4de5f7e304057d78e3bff90 | \
     examples/train/configs/ascend/minimax_h3_t2va_sft_smoke.yaml:51b24a7c5d21cc3c7eb5e17be5029b9dddc1c08c017225e4ee53b1eb34815623 | \

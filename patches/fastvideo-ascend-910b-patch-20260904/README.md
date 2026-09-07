@@ -16,7 +16,7 @@ Commit：7bb76b5ec99807a66aa3047b901f15019abe0f00
 参考镜像：quay.io/ascend/triton:3.2.1-cann9.0.0-torch_npu2.7.1.post4-910b-ubuntu22.04-py3.11
 ```
 
-安装器处理 14 个官方源码文件，并加入 15 个昇腾环境、容器、配置、训练、权重检查和说明文件。
+安装器处理 15 个官方源码文件，并加入 15 个昇腾环境、容器、配置、训练、权重检查和说明文件。
 官方源码文件通过 `sed -i` 更新；新增文件从补丁载荷复制。
 
 ## 使用
@@ -164,6 +164,8 @@ python examples/inference/basic/basic_minimax_h3_dense_4step_ascend.py \
 ```
 
 推理入口强制五个 sigma 网格点，即恰好四次 DiT forward。
+推理 stage 计时使用当前平台的同步接口：昇腾调用 `torch.npu.synchronize()`，不会误入
+`torch.cuda.synchronize()`；stage 默认设备也跟随当前平台。
 
 完整说明见：
 

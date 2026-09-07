@@ -157,6 +157,11 @@ python examples/inference/basic/basic_minimax_h3_dense_4step_ascend.py \
   --prompt 'A cinematic scene with synchronized environmental sound.'
 ```
 
+Pipeline-stage timing dispatches synchronization through the active platform:
+Ascend uses `torch.npu.synchronize()`, CUDA/ROCm uses the CUDA-compatible
+interface, and CPU needs no accelerator synchronization. This avoids entering
+`torch.cuda.synchronize()` at the first timed stage on an NPU worker.
+
 This is explicitly a mechanics recipe. Recipe-specific loss weights, prompt
 distribution, score sampling, and convergence length remain gated on the
 official FastH3 training release. VSA comes only after dense four-step parity.

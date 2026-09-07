@@ -365,6 +365,11 @@ python examples/inference/basic/basic_minimax_h3_dense_4step_ascend.py \
 - 8 卡 sequence parallel
 - 关闭 VSA、FA4、CUDA 专用优化和数值顺序可能变化的融合
 
+stage 计时会按当前平台同步：昇腾使用 `torch.npu.synchronize()`，CUDA/ROCm 使用对应的
+`torch.cuda.synchronize()`，CPU不做同步。若旧补丁在第一个stage进入
+`torch.cuda.synchronize()` 报错，重新运行最新版 `install.sh` 后即可重试，不需要重新训练
+或导出模型。
+
 单步 bring-up 的验收目标是成功导出、严格重载并生成有声 MP4，不是视频质量。要获得可用
 质量仍需要公开且可验证的训练 recipe、数据规模和充分训练步数。
 
