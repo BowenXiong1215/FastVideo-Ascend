@@ -174,6 +174,9 @@ python scripts/repair_minimax_h3_export_dtype.py \
 推理入口强制五个 sigma 网格点，即恰好四次 DiT forward。
 推理 stage 计时使用当前平台的同步接口：昇腾调用 `torch.npu.synchronize()`，不会误入
 `torch.cuda.synchronize()`；stage 默认设备也跟随当前平台。
+H3 Qwen3-VL 的 RMSNorm 参数跟随 `text_encoder_precisions=bf16` 构造，避免 NPU 上每个
+decoder layer 混入 FP32 norm 参数并在 conditioning stage 触发 FSDP2 懒初始化断言；
+RMSNorm 的方差计算仍保持 FP32。
 
 完整说明见：
 

@@ -378,6 +378,10 @@ stage 计时会按当前平台同步：昇腾使用 `torch.npu.synchronize()`，
 `torch.cuda.synchronize()` 报错，重新运行最新版 `install.sh` 后即可重试，不需要重新训练
 或导出模型。
 
+H3 Qwen3-VL 的 RMSNorm 参数会跟随文本编码器的 BF16 精度构造，防止昇腾上每个 decoder
+layer 出现 BF16 linear 与 FP32 norm 混合、在 conditioning stage 触发 FSDP2 懒初始化断言。
+RMSNorm 的方差计算仍使用 FP32，不会移除归一化所需的数值稳定性。
+
 单步 bring-up 的验收目标是成功导出、严格重载并生成有声 MP4，不是视频质量。要获得可用
 质量仍需要公开且可验证的训练 recipe、数据规模和充分训练步数。
 
