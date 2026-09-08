@@ -178,6 +178,20 @@ H3 Qwen3-VL 的 RMSNorm 参数跟随 `text_encoder_precisions=bf16` 构造，避
 decoder layer 混入 FP32 norm 参数并在 conditioning stage 触发 FSDP2 懒初始化断言；
 RMSNorm 的方差计算仍保持 FP32。
 
+同条件输出原始 H3、四步 student 和性能报告：
+
+```bash
+python examples/inference/basic/compare_minimax_h3_dense_ascend.py \
+  --base-model-path /models/MiniMax-H3 \
+  --student-model-path runs/ascend_minimax_h3_dense_dmd2_4step_export \
+  --prompt 'A cinematic scene with synchronized environmental sound.' \
+  --output outputs/minimax_h3_dense_comparison
+```
+
+默认原模型使用 50 个 sigma 点（49 次 DiT forward），student 使用 5 个 sigma 点（4 次
+DiT forward）；两者采用相同 prompt、seed、尺寸和 Dense strict eager 路径。结果目录包含
+两个 MP4、独立日志以及 JSON/Markdown 性能对比。
+
 完整说明见：
 
 ```text

@@ -382,6 +382,20 @@ H3 Qwen3-VL 的 RMSNorm 参数会跟随文本编码器的 BF16 精度构造，�
 layer 出现 BF16 linear 与 FP32 norm 混合、在 conditioning stage 触发 FSDP2 懒初始化断言。
 RMSNorm 的方差计算仍使用 FP32，不会移除归一化所需的数值稳定性。
 
+同一 prompt 和 seed 下比较原始 50 点 sigma 网格（49 次 DiT forward）与四步 student：
+
+```bash
+python examples/inference/basic/compare_minimax_h3_dense_ascend.py \
+  --base-model-path /models/MiniMax-H3 \
+  --student-model-path runs/ascend_minimax_h3_dense_dmd2_4step_export \
+  --prompt 'A cinematic ocean wave crashes against dark rocks, with synchronized roaring water and wind.' \
+  --output outputs/minimax_h3_dense_comparison
+```
+
+两个模型都使用 Dense `TORCH_SDPA`、strict eager 路径、相同尺寸和随机种子。入口分别在独立
+进程运行并完整释放 worker，生成 base/student MP4、逐次日志、`comparison.json` 和
+`comparison.md`。报告同时区分端到端耗时、denoising 耗时和每次 DiT forward 平均耗时。
+
 单步 bring-up 的验收目标是成功导出、严格重载并生成有声 MP4，不是视频质量。要获得可用
 质量仍需要公开且可验证的训练 recipe、数据规模和充分训练步数。
 
