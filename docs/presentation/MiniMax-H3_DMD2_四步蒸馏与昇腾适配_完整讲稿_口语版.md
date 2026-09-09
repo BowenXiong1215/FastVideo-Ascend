@@ -378,53 +378,55 @@ Student 学习率过大，可能会快速破坏原模型已经具备的能力；
 
 ---
 
-## 第 14 页：FastVideo 昇腾适配的实际代码改动
+## 第 14 页：从原版 FastVideo 到 910B，补齐四个断点
 
-前面讲完训练机制以后，这一页不再讲一套抽象的方法论，而是直接回到代码：我们为了让这条 H3 DMD2 链路在八张 910B 上运行，实际改了哪些地方。
+这一页我们直接回答一个问题：相对于原版 FastVideo，我们到底改了什么，才让 H3 这条路径能够在八张 910B 上跑起来？
 
-我把改动归成四层。这里没有列环境安装，因为那部分主要是版本和依赖管理；这一页只保留真正进入 FastVideo 代码路径的修改。
+先把边界说清楚。原版 FastVideo 并不是完全没有昇腾代码。它已经提供了 `NPUPlatform`，也有 HCCL communicator。所以我们的工作不是从头重写一个 NPU 后端，而是把 H3 训练和推理真正经过的路径走一遍，找到其中仍然依赖 CUDA 或假设加速卡显存足够大的断点，再逐个补齐。
 
-第一层是设备与平台抽象。
+第一个断点是设备调度。
 
-FastVideo 原来已经有平台接口，但部分业务路径仍然直接调用 CUDA。最典型的是 `pipelines/stages/base.py`。阶段计时开始和结束时，原代码固定执行 `torch.cuda.synchronize()`。NPU 本身是异步执行的，如果仍然调用 CUDA，同步对象就错了，推理甚至会在第一个 stage 直接失败。
+原版 `pipelines/stages/base.py` 在记录每个推理 stage 的耗时时，开始前和结束后都会固定调用 `torch.cuda.synchronize()`。GPU 和 NPU 的计算通常都是异步提交的，所以准确计时确实需要同步；问题在于，这里同步的是 CUDA，而不是当前正在工作的 NPU。程序在 910B 上进入第一个 stage 时，就可能直接卡在这行代码上。
 
-我们增加了 `_synchronize_accelerator()`：当前平台是 NPU 时调用 `torch.npu.synchronize()`，是 CUDA 类平台时再调用 `torch.cuda.synchronize()`。同一个文件里，stage 的 device 也从手工判断 CUDA 攩成 `current_platform.device_type`。
+我们的修改是增加一个按平台分发的同步函数。当前平台是 NPU，就执行 `torch.npu.synchronize()`；当前平台是 CUDA 类设备，才执行 `torch.cuda.synchronize()`。stage 的 device 也不再自己判断 CUDA 是否可用，而是直接读取 `current_platform.device_type`。
 
-同样的 CUDA 假设还出现在数据预处理、sequence parallel 通信预热和缓存清理中。`preprocess_minimax_h3_overfit.py` 不再把张量写死到 `cuda:0`，而是使用当前进程的本地设备；`communication_op.py` 的 SP warm-up 使用 `get_local_torch_device()`，同步也走平台接口；`parallel_state.py` 清理缓存时同时识别 CUDA 和 NPU。
+类似的硬编码不只这一处。H3 预处理原来把视频和音频张量直接放到 `cuda:0`，sequence parallel 的通信预热默认创建 CUDA tensor，通信结束也固定做 CUDA 同步，分布式状态销毁时的缓存清理同样只检查 CUDA。我们分别把这些位置改成 `get_local_torch_device()` 或 `current_platform`。这样每个 rank 都会使用自己绑定的那张 NPU，而不是八个进程都落到零号设备，或者误入 CUDA 接口。
 
-另外，`platforms/npu.py` 补上了 `seed_everything()`。它同时设置 Python、NumPy、PyTorch 和所有 NPU 的随机种子。这样八个 rank 的随机状态才由同一套平台逻辑管理，checkpoint 恢复时也有明确的基础。
+`platforms/npu.py` 里还补充了 NPU 的 `seed_everything()`，统一设置 Python、NumPy、PyTorch 和 NPU 的随机种子。这一部分解决的是设备路径完整性：程序从预处理、通信到推理计时，经过的每个硬件调用都真正指向 910B。
 
-第二层是算子和 dtype。
+第二个断点是 Dense Attention 后端。
 
-算子方面，我们当前做的是 Dense 路线，所以训练和推理都固定使用 PyTorch 的 `TORCH_SDPA`。这里的 SDPA 是标准 scaled dot product attention。它不依赖 FlashAttention 或 Triton 的 CUDA kernel，先保证 Dense attention 在 NPU 上语义正确。
+原版 FastH3 推理入口在 Dense 模式下默认把 attention backend 写成 `FLASH_ATTN`。FlashAttention 和很多 Triton 实现依赖 CUDA kernel，代码即使能识别 NPU，真正跑到 attention 时也不能直接在 910B 上执行。
 
-更关键的修改其实是 dtype。Qwen3-VL 文本编码器中，线性层在 BF16 上构造，但 RMSNorm 参数原来会默认成为 FP32。单独 forward 未必立刻报错，可是 FSDP 懒初始化会把一组参数展平，它要求这一组参数的原始 dtype 一致，于是就出现了“同一参数组混合 BF16 和 FP32”的断言失败。
+我们没有在这一阶段重写一个高性能 NPU attention kernel，而是先开放 `dense_attention_backend` 这个选择，并让 Ascend 的训练、基础模型对比和四步 Student 推理全部固定使用 `TORCH_SDPA`。
 
-我们在 `minimax_h3_qwen3_vl.py` 中显式让 q norm、k norm、每层前后的 RMSNorm，以及最终 norm，都按照当前默认参数 dtype 构造。在 H3 这条路径上就是 BF16。这里没有把归一化内部所有计算都降成 BF16，RMSNorm 计算方差时仍然可以转成 FP32，因此参数一致性和数值稳定性可以同时保留。
+SDPA 是 PyTorch 提供的 scaled dot product attention 标准接口。这里最重要的不是它一定最快，而是它不依赖 FastVideo 原来选择的 CUDA 专属 kernel，并且训练和推理可以使用同一套 Dense attention 语义。这样我们排查训练精度时，不会同时混入“训练一种 attention、推理又换另一种 attention”的变量。
 
-训练时统一了 dtype，导出以后也必须记住这个约定。为此，`dcp_to_diffusers.py` 会把 `uniform_parameter_dtype` 写入导出模型的 `config.json`，`minimax_h3_pipeline.py` 加载时再读取这个字段。否则导出的 Student 虽然权重是 BF16，推理框架却可能按基础模型原来的混合 dtype 重新建模，最后仍然在 FSDP 初始化时失败。
+第三个断点是权重加载和显存生命周期。
 
-第三层是分布式和内存。
+这个问题比普通的 NPU 算子替换更关键。DMD2 同时需要 Student、Teacher 和 Critic，三个角色都是三十三B。即使最后用 FSDP 把参数分到八张卡，原版加载流程仍可能在分片以前，先把一份完整的 H3 权重送进某张加速卡；参数名称映射时还会先构造完整的 state dict。于是训练还没有开始，单卡就已经因为加载峰值而 OOM。
 
-DMD2 同时存在 Student、Teacher 和 Critic，三个角色都是三十三B。单靠普通八卡分片，权重加载阶段仍可能先在某张 NPU 上形成一份完整模型，然后才做 FSDP 分片。这时训练还没开始，单卡就已经越过显存上限。
+我们对这个过程做了两层改造。
 
-因此我们增加了 `fsdp_cpu_offload` 配置，并在 `moduleloader.py` 中把它传给模型加载流程。当前 DMD2 配置让三个角色都使用 FSDP CPU offload，也就是暂时不用的参数可以留在主机内存，需要计算时再搬到 NPU。这会牺牲速度，但不会改变 BF16 训练数学，符合我们目前先保证训练精度和可运行性的目标。
+第一层是 CPU staging。在 NPU 平台上，不管最终参数是否做 CPU offload，checkpoint 都先从磁盘读到主机内存，再把每个 tensor 分别送去映射和 FSDP 放置。这样不会让一份未分片的三十三B权重先完整进入 910B。
 
-`fsdp_load.py` 还做了第二层控制。NPU 加载 H3 时先把 checkpoint tensor 放在 CPU，然后逐张量完成名称映射、合并和分片放置。`models/loader/utils.py` 新增的延迟迭代器不会先把整个未分片 state dict 收集成一个大字典，只保留尚未凑齐的合并参数组。这样控制的是权重加载峰值，而不是只看模型进入稳定训练以后占多少显存。
+第二层是延迟映射。原来的 `hf_to_custom_state_dict()` 会把映射结果集中到一个大字典以后再开始放置。我们增加了 `iter_hf_to_custom_state_dict()`，可以转换完一个参数就立即交给 FSDP。只有 q、k、v 这类必须凑齐后合并的参数组会短暂保留，合并完成就释放。
 
-通信侧沿用 HCCL，但我们修正了 SP warm-up 的本地设备选择和同步方式。这样每个 rank 会在自己绑定的 NPU 上创建预热张量，不会因为默认 `cuda` 设备或错误的同步接口把通信问题和设备问题混在一起。
+在稳定训练阶段，Student、Teacher 和 Critic 还全部启用了 FSDP CPU offload。暂时不用的参数留在 CPU，需要执行对应层时再搬到 NPU。这会让训练变慢，但它没有减少模型或改变训练目标，换来的是三套三十三B角色能够在八张六十四GB的 910B 上同时存在。
 
-第四层是数据、训练和产物。
+所以这里要区分两个峰值。CPU staging 和延迟映射解决模型刚加载时的瞬时峰值；FSDP CPU offload 解决训练过程中参数长期驻留的显存压力。只做其中一个，都不一定能把三角色训练真正启动起来。
 
-预处理入口现在支持本地 MiniMax-H3 权重、任意带音轨的 MP4 和自定义 caption，不再绑定某一个在线数据集。为了降低单卡峰值，脚本按顺序加载 video VAE、audio VAE 和 Qwen3-VL：一个组件处理完就把 latent 或 embedding 移回 CPU，释放组件并清理 NPU 缓存，然后再加载下一个。
+第四个断点是启动入口和训练状态。
 
-训练部分新增了 H3 专用的 `minimax_h3_dmd2.py`。它把通用 DMD2 的 Student、Teacher、Critic 结构接到 H3 的联合视频音频 latent 上，分别处理 video shift 和 audio shift，同时实现四步 rollout、Critic MSE 和双模态 DMD loss。
+原版 `examples/train/run.sh` 只通过 `nvidia-smi` 自动发现设备数量。到了昇腾机器上，即使底层 NPUPlatform 已经存在，上层启动脚本也不知道该启动多少个进程。
 
-checkpoint 也不能只保存 CUDA 随机状态。`checkpoint.py` 改成通过当前平台保存和恢复 accelerator RNG，同时保留旧字段兼容；每个 rank 单独保存自己的随机状态，这样恢复训练时才能延续各自的采样序列。
+我们让通用入口可以识别 `npu-smi`，同时新增 `run_ascend.sh`。这个脚本会先导入 `torch_npu`，确认 NPU 可用，再设置八张卡的可见设备、HCCL 连接超时和 NPU 显存分配策略，最后按 NPU 数量启动分布式 worker。配套的 910B 配置再明确 Dense SDPA、FSDP CPU offload 和并行规模。
 
-最后是产物出口。DCP checkpoint 首先服务于恢复训练，所以它仍然包含分片训练状态。导出脚本再把其中的 Student 转成独立模型目录，写入 dtype contract。随后 `basic_minimax_h3_dense_4step_ascend.py` 固定四个时间点，只执行四次 Transformer forward；`compare_minimax_h3_dense_ascend.py` 则在相同 prompt、seed 和尺寸下分别运行基础模型和四步 Student，记录两边的输出与耗时。
+checkpoint 方面，原版代码固定保存和恢复 `torch.cuda` 的随机状态。我们把它改成从 `current_platform` 取得当前加速器，再按 rank 保存和恢复对应设备的 RNG。RNG 就是随机数生成器状态。DMD2 的时间步采样、噪声和 rollout 都依赖随机数；如果恢复 checkpoint 时丢掉 NPU 的 RNG，虽然程序还能继续跑，但它已经不是中断前那条连续的训练轨迹。
 
-所以这次适配不是简单地把 `cuda` 字符串替换成 `npu`。代码实际上贯通了四条连续链路：每个进程把计算放到正确设备；算子和参数遵守一致的 dtype 契约；三个三十三B角色在加载和训练阶段不超过单卡显存；最终训练状态能够转成可独立加载的严格四步 Student。
+把这四类修改合起来看，最终效果就很清楚了。原版 FastVideo 已经有通用的 NPU 骨架，但 H3 路径里仍然存在设备调用走错、Dense attention 落到 CUDA kernel、完整权重在分片前挤爆单卡，以及启动和恢复状态不认识 NPU这四个断点。
+
+我们的补丁没有重写整个 FastVideo，而是把这四个断点补齐。于是同一套 H3 代码才能从数据预处理开始，经过八卡 HCCL 和三角色 FSDP 训练，再进入四步推理，而每个阶段使用的都是真正的 910B 执行路径。
 
 ---
 
