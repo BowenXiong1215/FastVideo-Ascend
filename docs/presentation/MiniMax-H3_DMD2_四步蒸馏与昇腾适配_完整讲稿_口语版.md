@@ -378,75 +378,53 @@ Student 学习率过大，可能会快速破坏原模型已经具备的能力；
 
 ---
 
-## 第 14 页：训练框架昇腾迁移的五层结构
+## 第 14 页：FastVideo 昇腾适配的实际代码改动
 
-前面讲完 H3 的训练流程以后，这一页我们把视角稍微拉高一点。
+前面讲完训练机制以后，这一页不再讲一套抽象的方法论，而是直接回到代码：我们为了让这条 H3 DMD2 链路在八张 910B 上运行，实际改了哪些地方。
 
-这里不再复盘某一个报错是怎么修的，而是回答一个更通用的问题：如果下次换成另一个训练框架，我们应该从哪里开始做昇腾适配？
+我把改动归成四层。这里没有列环境安装，因为那部分主要是版本和依赖管理；这一页只保留真正进入 FastVideo 代码路径的修改。
 
-我建议把整个工作拆成五层。这样做的好处是，遇到问题时不会在所有代码里同时排查，而是先判断它属于哪一层。
+第一层是设备与平台抽象。
 
-第一层是运行环境和依赖。
+FastVideo 原来已经有平台接口，但部分业务路径仍然直接调用 CUDA。最典型的是 `pipelines/stages/base.py`。阶段计时开始和结束时，原代码固定执行 `torch.cuda.synchronize()`。NPU 本身是异步执行的，如果仍然调用 CUDA，同步对象就错了，推理甚至会在第一个 stage 直接失败。
 
-这一层包括驱动、CANN、PyTorch、torch_npu，以及框架自身的 Python 依赖。CANN 是昇腾的软件栈，负责把上层计算落实到 NPU；torch_npu 是 PyTorch 与昇腾之间的适配层，让 PyTorch 张量和算子能够在 NPU 上执行。
+我们增加了 `_synchronize_accelerator()`：当前平台是 NPU 时调用 `torch.npu.synchronize()`，是 CUDA 类平台时再调用 `torch.cuda.synchronize()`。同一个文件里，stage 的 device 也从手工判断 CUDA 攩成 `current_platform.device_type`。
 
-最重要的是先固定一套明确的版本矩阵，因为这几部分不是互相独立的。某个版本的 torch_npu 通常只对应特定版本的 PyTorch 和 CANN。版本没有对齐时，问题可能表现为安装失败、动态库找不到，也可能直到第一次执行算子才暴露。
+同样的 CUDA 假设还出现在数据预处理、sequence parallel 通信预热和缓存清理中。`preprocess_minimax_h3_overfit.py` 不再把张量写死到 `cuda:0`，而是使用当前进程的本地设备；`communication_op.py` 的 SP warm-up 使用 `get_local_torch_device()`，同步也走平台接口；`parallel_state.py` 清理缓存时同时识别 CUDA 和 NPU。
 
-同时还要检查依赖列表里有没有 CUDA 专属包。像只提供 CUDA kernel 的 attention 库、带 CUDA 编译过程的扩展，如果不做隔离，可能在安装阶段就失败，也可能安装成功以后在导入时才失败。
+另外，`platforms/npu.py` 补上了 `seed_everything()`。它同时设置 Python、NumPy、PyTorch 和所有 NPU 的随机种子。这样八个 rank 的随机状态才由同一套平台逻辑管理，checkpoint 恢复时也有明确的基础。
 
-所以第一层解决的是：这个框架能不能稳定进入昇腾的软件环境，而且换一台机器以后还能按照同样的组合重新搭起来。
+第二层是算子和 dtype。
 
-第二层是设备和平台抽象。
+算子方面，我们当前做的是 Dense 路线，所以训练和推理都固定使用 PyTorch 的 `TORCH_SDPA`。这里的 SDPA 是标准 scaled dot product attention。它不依赖 FlashAttention 或 Triton 的 CUDA kernel，先保证 Dense attention 在 NPU 上语义正确。
 
-成熟的适配不应该在业务代码里到处写 if cuda、else npu。更合理的方式，是把硬件差异收敛到统一的平台接口里。
+更关键的修改其实是 dtype。Qwen3-VL 文本编码器中，线性层在 BF16 上构造，但 RMSNorm 参数原来会默认成为 FP32。单独 forward 未必立刻报错，可是 FSDP 懒初始化会把一组参数展平，它要求这一组参数的原始 dtype 一致，于是就出现了“同一参数组混合 BF16 和 FP32”的断言失败。
 
-这里需要覆盖 device、stream、event、synchronize、显存管理、随机数、autocast、缓存释放以及可见设备等能力。
+我们在 `minimax_h3_qwen3_vl.py` 中显式让 q norm、k norm、每层前后的 RMSNorm，以及最终 norm，都按照当前默认参数 dtype 构造。在 H3 这条路径上就是 BF16。这里没有把归一化内部所有计算都降成 BF16，RMSNorm 计算方差时仍然可以转成 FP32，因此参数一致性和数值稳定性可以同时保留。
 
-device 决定张量和模型放在哪张卡上；stream 是设备上安排异步计算的执行队列；event 用来记录或协调队列中的时间点；synchronize 则强制等待设备任务完成，常用于准确计时或者确保后续操作能看到结果。autocast 是自动混合精度，它决定哪些运算可以用 BF16 这类较低精度执行，哪些需要保留更高精度。
+训练时统一了 dtype，导出以后也必须记住这个约定。为此，`dcp_to_diffusers.py` 会把 `uniform_parameter_dtype` 写入导出模型的 `config.json`，`minimax_h3_pipeline.py` 加载时再读取这个字段。否则导出的 Student 虽然权重是 BF16，推理框架却可能按基础模型原来的混合 dtype 重新建模，最后仍然在 FSDP 初始化时失败。
 
-上层训练代码只调用统一接口，具体是 CUDA 还是 NPU，由平台实现决定。
+第三层是分布式和内存。
 
-如果这一层没有整理好，后面即使主模型已经搬到 NPU，预处理、日志统计、checkpoint 或通信 warm-up 中仍可能残留 CUDA 调用。
+DMD2 同时存在 Student、Teacher 和 Critic，三个角色都是三十三B。单靠普通八卡分片，权重加载阶段仍可能先在某张 NPU 上形成一份完整模型，然后才做 FSDP 分片。这时训练还没开始，单卡就已经越过显存上限。
 
-第三层是算子和数值精度。
+因此我们增加了 `fsdp_cpu_offload` 配置，并在 `moduleloader.py` 中把它传给模型加载流程。当前 DMD2 配置让三个角色都使用 FSDP CPU offload，也就是暂时不用的参数可以留在主机内存，需要计算时再搬到 NPU。这会牺牲速度，但不会改变 BF16 训练数学，符合我们目前先保证训练精度和可运行性的目标。
 
-这一层首先要盘点框架依赖了哪些自定义 CUDA kernel，哪些标准 PyTorch 算子在 NPU 上已经支持，哪些需要更换实现。
+`fsdp_load.py` 还做了第二层控制。NPU 加载 H3 时先把 checkpoint tensor 放在 CPU，然后逐张量完成名称映射、合并和分片放置。`models/loader/utils.py` 新增的延迟迭代器不会先把整个未分片 state dict 收集成一个大字典，只保留尚未凑齐的合并参数组。这样控制的是权重加载峰值，而不是只看模型进入稳定训练以后占多少显存。
 
-Attention 往往是最典型的例子。原框架可能使用 FlashAttention、Triton kernel 或自己的 fused attention。kernel 可以理解成真正交给加速卡执行的一段底层计算程序；fused 表示把多个小算子合并执行，减少中间读写。迁移时可以先选择语义一致、数值稳定的标准实现，把训练正确性跑通，再考虑更高性能的 NPU 算子。
+通信侧沿用 HCCL，但我们修正了 SP warm-up 的本地设备选择和同步方式。这样每个 rank 会在自己绑定的 NPU 上创建预热张量，不会因为默认 `cuda` 设备或错误的同步接口把通信问题和设备问题混在一起。
 
-除了算子可用性，还要明确 BF16 和 FP32 的边界。dtype 就是张量中每个数字采用的数据类型。BF16 占用更少的显存，计算也更快；FP32 保留的信息更多，在某些对数值敏感的运算里更稳定。
+第四层是数据、训练和产物。
 
-参数是什么 dtype，输入特征是什么 dtype，归一化和损失计算是否需要更高精度，FSDP 参数组是否允许混合 dtype，这些都属于这一层。这里不能只看单个张量能不能算，还要看进入同一个模块或同一个参数组的 dtype 契约是否一致。否则模型可能在普通 forward 时没问题，到了 FSDP 懒初始化才因为同组参数混合类型而失败。
+预处理入口现在支持本地 MiniMax-H3 权重、任意带音轨的 MP4 和自定义 caption，不再绑定某一个在线数据集。为了降低单卡峰值，脚本按顺序加载 video VAE、audio VAE 和 Qwen3-VL：一个组件处理完就把 latent 或 embedding 移回 CPU，释放组件并清理 NPU 缓存，然后再加载下一个。
 
-第四层是分布式和内存。
+训练部分新增了 H3 专用的 `minimax_h3_dmd2.py`。它把通用 DMD2 的 Student、Teacher、Critic 结构接到 H3 的联合视频音频 latent 上，分别处理 video shift 和 audio shift，同时实现四步 rollout、Critic MSE 和双模态 DMD loss。
 
-很多人会把这一层理解成把 NCCL 改成 HCCL，但实际上远远不够。NCCL 和 HCCL 都是多卡通信库：前者主要服务于 NVIDIA GPU，后者服务于昇腾 NPU。它们负责梯度聚合、张量交换等 collective，也就是所有卡共同参与的集合通信操作。
+checkpoint 也不能只保存 CUDA 随机状态。`checkpoint.py` 改成通过当前平台保存和恢复 accelerator RNG，同时保留旧字段兼容；每个 rank 单独保存自己的随机状态，这样恢复训练时才能延续各自的采样序列。
 
-还要处理 rank 和 NPU 的映射。rank 可以理解成一个分布式 worker 的编号，通常一个进程绑定一张 NPU；绑定错误时，就可能出现多个进程挤在同一张卡，或者某些进程根本看不到目标设备。
+最后是产物出口。DCP checkpoint 首先服务于恢复训练，所以它仍然包含分片训练状态。导出脚本再把其中的 Student 转成独立模型目录，写入 dtype contract。随后 `basic_minimax_h3_dense_4step_ascend.py` 固定四个时间点，只执行四次 Transformer forward；`compare_minimax_h3_dense_ascend.py` 则在相同 prompt、seed 和尺寸下分别运行基础模型和四步 Student，记录两边的输出与耗时。
 
-device mesh 描述这些 rank 按哪些维度组成通信拓扑。FSDP 会把模型参数、梯度和优化器状态分片到多张卡；tensor parallel 把一层里的大矩阵计算拆到多卡；sequence parallel 则沿序列维度拆分长 token。它们解决的问题不同，组合时必须保证切分维度和通信组一致。
-
-大模型场景还要专门考虑权重装载峰值。完整权重在哪里读取，什么时候分片，是否需要 CPU staging，哪些状态做 offload，activation checkpoint 放在哪一层，都会影响模型能不能真正进入多卡。
-
-CPU staging 是先在主机内存中暂存或逐块整理权重，避免每张卡都同时装入一份完整模型；offload 是把暂时不用的参数或优化器状态放回 CPU；activation checkpoint 则是不保存一部分 forward 中间结果，backward 时重新计算，用额外计算换显存。它和保存训练 checkpoint 不是一回事，只是名字里刚好都有 checkpoint。
-
-所以这一层同时解决通信拓扑和内存生命周期，而不只是更换一个通信后端名称。
-
-第五层是数据、模型和产物。
-
-这一层最容易被忽略，因为大家往往只盯着训练主循环。但一个完整框架还包括数据预处理、模型本地加载、随机状态、checkpoint 保存恢复、模型导出和推理入口。
-
-预处理代码可能自己选择设备；文本编码器和主模型可能有不同的 dtype 规则；分布式训练保存的 checkpoint，也不一定就是推理框架可以直接加载的模型目录。
-
-训练 checkpoint 的首要目标是能接着训练，所以除了模型参数，它往往还包含 optimizer 状态、训练步数、随机数状态以及分片信息。推理模型的首要目标是能独立加载和生成，通常只需要整理后的 Student 权重和配置。因此二者不能只看“磁盘上已经有文件”就当成同一种产物。
-
-因此适配最后必须把训练入口和产物出口都接通。训练状态用于恢复训练，导出的模型用于独立加载，两种产物应该有清楚的边界和转换关系。
-
-把这五层放在一起看，昇腾迁移就不是把代码里的 cuda 换成 npu。
-
-真正要做的是，系统地消除框架在运行环境、设备接口、算子精度、分布式内存和模型产物上的 CUDA 假设。
-
-这五层也可以直接拿去拆解其他训练框架。先看它的平台抽象是否完整，再看算子和精度，然后进入分布式与模型产物，不需要从具体报错开始摸索。
+所以这次适配不是简单地把 `cuda` 字符串替换成 `npu`。代码实际上贯通了四条连续链路：每个进程把计算放到正确设备；算子和参数遵守一致的 dtype 契约；三个三十三B角色在加载和训练阶段不超过单卡显存；最终训练状态能够转成可独立加载的严格四步 Student。
 
 ---
 
